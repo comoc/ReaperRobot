@@ -36,7 +36,13 @@ namespace Plusplus.ReaperRobot.Scripts.Unitycomponent.TestRobot
 
         private void FixedUpdate()
         {
-            if (!_playerInput.enabled || _playerInput.currentActionMap.name != "Reaper") return;
+            // if (!_playerInput.enabled || _playerInput.currentActionMap.name != "Reaper") return;
+            if (!_playerInput.enabled) return;
+            else if (_playerInput.currentActionMap.name != "Reaper")
+            {
+                _testRobotManager.Move(0f, 0f);
+                return;
+            }
 
             var move = _actionMap["Move"].ReadValue<Vector2>();
             _testRobotManager.Move(move.x, move.y);

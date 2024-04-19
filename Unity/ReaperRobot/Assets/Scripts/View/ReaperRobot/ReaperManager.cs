@@ -4,6 +4,8 @@ using System.Threading;
 using System.Linq;
 using UniRx;
 using UnityEngine;
+using System.Numerics;
+using System.Collections.Specialized;
 
 namespace Plusplus.ReaperRobot.Scripts.View.ReaperRobot
 {
@@ -61,6 +63,25 @@ namespace Plusplus.ReaperRobot.Scripts.View.ReaperRobot
         readonly float _minLiftAngle = 0f;
         readonly float _liftSpeed = 10f;
         #endregion
+
+        private struct Input
+        {
+            public Input(float time, float horizontal, float vertical)
+            {
+                this.time = time;
+                this.horizontal = horizontal;
+                this.vertical = vertical;
+            }
+            public float time;
+            public float horizontal;
+            public float vertical;
+        }
+
+        private List<Input> inputHistory = new();
+        [SerializeField] private float delayTime = 1.0f;
+        private float filteredHorizontal = 0;
+        private float filteredVertical = 0;
+        [SerializeField] private float filterGain = 0.9f;
 
 
         #region MonoBehaviour Callbacks
@@ -133,6 +154,34 @@ namespace Plusplus.ReaperRobot.Scripts.View.ReaperRobot
         /// <param name="vertical">垂直方向の入力。-1~+1の範囲</param>
         public void Move(float horizontal, float vertical)
         {
+            inputHistory.Add(new Input(Time.time, horizontal, vertical));
+            
+            // 一定時間前の入力を取得
+            int i = -1;
+            foreach (var item in inputHistory)
+            {
+                if (Time.time - item.time >= delayTime)
+                {
+                    horizontal = item.horizontal;
+                    vertical = item.vertical;
+                    i += 1;
+                }
+            }
+
+            // 一定時間前の入力がない場合は処理を行わない
+            if (i < 0)
+            {
+                return;
+            }
+
+            // 一定時間前の入力を削除
+            for (int j = 0; j <= i; j++)
+            {
+                inputHistory.Remove(inputHistory.First());
+            }
+
+            Debug.Log("Count: " + inputHistory.Count);
+
             if (_wheelColliderL.Count == 0 || _wheelColliderR.Count == 0) return;
             
             if (horizontal == 0 && vertical == 0)
@@ -150,9 +199,12 @@ namespace Plusplus.ReaperRobot.Scripts.View.ReaperRobot
             horizontal = Mathf.Clamp(horizontal, -1, 1);
             vertical = Mathf.Clamp(vertical, -1, 1);
 
+            filteredHorizontal = filterGain * filteredHorizontal + (1f - filterGain) * horizontal;
+            filteredVertical = filterGain * filteredVertical + (1f - filterGain) * vertical;
+
             //入力値を記録
-            _inputH.Value = horizontal;
-            _inputV.Value = vertical;
+            _inputH.Value = filteredVertical;
+            _inputV.Value = filteredHorizontal;
 
             //左右車輪のトルクを計算
             var torqueL = _params.MoveTorque.Value * vertical;
